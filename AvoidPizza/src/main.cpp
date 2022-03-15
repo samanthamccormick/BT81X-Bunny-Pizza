@@ -14,15 +14,25 @@
 
 static uint32_t hit_time2 = millis() - 5000;
 static uint32_t goal_time = millis()-2000;
+
+int blue_random = random(5000, 15000);
+int blue2_random = random(11000, 25000);
+int straw_random = random(5000, 14000);
+int straw2_random = random(10000, 25000);
 cl_timer last_touch(100);
-cl_timer eaten_blueberry(5000);
-cl_timer eaten_strawberry(5000);
-cl_timer last_blueberry(10000);
-cl_timer last_strawberry(10000);
+cl_timer eaten_blueberry(10000); //Duration of scale effect after blueberry
+cl_timer eaten_strawberry(10000); //Duration of scale effect after strawberry
+cl_timer strawberry_time(5000);
+cl_timer second_strawberry(5000);
+cl_timer blueberry_time(7000);
+cl_timer second_blueberry(5000);
+int numOfBlueberries = 0;
+int num = 0;
 int bunny_x = 0; //One sprite
 int bunny_y = 160;
 int counter = 0;
 int maxDistance = 20;
+int fruit_flag = 0;
 boolean flag_fade=false;
 
 int alpha2=0;
@@ -66,7 +76,6 @@ public:
 			reset();
 		}
 	}
-
 	void show1(){
 	GD.ColorA(alpha);
 	//static int z=random(10,18); DO NOT place this here! Place it in before the access specifier to achieve different falling pizza bitmaps
@@ -74,80 +83,205 @@ public:
 	}
 };
 
-class levelUp{
-	float yspeed = random(1,3); 
+enum
+{
+	LEVEL_UP_WAITING,
+	LEVEL_UP_FALLING,
+	LEVEL_UP_LANDED,
+	LEVEL_UP_DESTROY
+};
+
+class levelUp
+{
+	float yspeed = 0.5;
 	int z = 20;
-public:
 	int alpha = 255;
-	float x = random(0,290);
-	float y = random(-200,-10);
-	
-	void reset(){
-		alpha=255;
-		y=random(-200,-10);
-		x=random(0,290);
-		yspeed = random(0.5,1.5);
-	}
-	void fall(){
-		if (y<190){
-		y += yspeed;
-		yspeed += 0.002;}
-		else{
-			y=190;
-			yspeed=0;
-			alpha-=1;
-		}
-		if (alpha<5){
-		alpha = 0;
+
+public:
+	float x = random(0, 290);
+	float y = random(-200, -10);
+	float y_start = -200;
+	int state = LEVEL_UP_WAITING; //starting state
+	bool flag_start = false;
+	bool flag_destroy = false;
+
+	uint32_t falling_start_time;
+	uint32_t landed_start_time;
+
+	void process()
+	{
+		switch (state)
+		{
+		case LEVEL_UP_WAITING:
+			if (flag_start)
+			{
+				flag_start = false;
+				state = LEVEL_UP_FALLING; //describing falling state
+				falling_start_time = millis();
+				x = random(0, 290);
+				y_start = -200;
+				y = y_start;
+				alpha = 255;
+			}
+			break;
+		case LEVEL_UP_FALLING:
+			y = y_start + (millis() - falling_start_time)/10 * yspeed;
+			if (y > 190)
+			{
+				y = 190;
+				state = LEVEL_UP_LANDED;
+				landed_start_time = millis();
+			}
+			if (flag_destroy)
+			{
+				flag_destroy = false;
+				state = LEVEL_UP_DESTROY;
+			}
+			break;
+		case LEVEL_UP_LANDED:
+
+			alpha = 255 - (millis() - landed_start_time) / 10;
+			if (alpha < 5 || flag_destroy)
+			{
+				flag_destroy = false;
+				state = LEVEL_UP_DESTROY;
+			}
+			break;
+		case LEVEL_UP_DESTROY:
+			//state = LEVEL_UP_WAITING;
+			break;
 		}
 	}
 
-	void show1(){
-	GD.ColorA(alpha);
-	GD.Vertex2ii(x,y,z);
+	void draw()
+	{
+		switch (state)
+		{
+		case LEVEL_UP_WAITING:
+			// nothing to draw
+			break;
+		case LEVEL_UP_FALLING:
+			GD.ColorA(255);
+			GD.Vertex2ii(x, y, z);
+			break;
+		case LEVEL_UP_LANDED:
+			GD.ColorA(alpha);
+			GD.Vertex2ii(x, y, z);
+			break;
+		case LEVEL_UP_DESTROY:
+//
+			break;
+		}
+	}
+
+	void start()
+	{
+		flag_start = true;
+	}
+	void destroy()
+	{
+		flag_destroy = true;
 	}
 };
 
+enum
+{
+	LEVEL_DOWN_WAITING,
+	LEVEL_DOWN_FALLING,
+	LEVEL_DOWN_LANDED,
+	LEVEL_DOWN_DESTROY
+};
+
 class levelDown{
-	float yspeed = random(1,3); 
+	float yspeed = 0.5; 
 	int z = 21;
 public:
 	int alpha = 255;
 	float x = random(0,290);
 	float y = random(-200,-10);
-	
-	void reset(){
-		alpha=255;
-		y=random(-200,-10);
-		x=random(0,290);
-		yspeed = random(0.5,1.5);
+	float y_start = -200;
+	int state = LEVEL_DOWN_WAITING;
+	bool flag_start = false;
+	bool flag_destroy = false;
+	uint32_t falling_start_time;
+	uint32_t landed_start_time;
+
+	void process()
+	{
+		switch(state)
+		{
+			case LEVEL_DOWN_WAITING:
+				if (flag_start)
+				{
+					flag_start = false;
+					state = LEVEL_DOWN_FALLING;
+					falling_start_time = millis();
+					x = random(0,290);
+					y_start = -200;
+					y = y_start;
+					alpha = 255;
+				}
+				break;
+			case LEVEL_DOWN_FALLING:
+				y = y_start + (millis()-falling_start_time)/10 * yspeed;
+				if (y > 190)
+				{
+					y = 190;
+					state = LEVEL_DOWN_LANDED;
+					landed_start_time = millis();
+				}
+				if (flag_destroy)
+				{
+					flag_destroy = false;
+					state = LEVEL_DOWN_DESTROY;
+				}
+				break;
+			case LEVEL_DOWN_LANDED:
+				alpha = 255 - (millis() - landed_start_time)/10;
+				if (alpha < 5 || flag_destroy)
+				{
+					flag_destroy = false;
+					state = LEVEL_DOWN_DESTROY;
+				}
+				break;
+			case LEVEL_DOWN_DESTROY:
+				break;
+		}
 	}
-	void fall(){
-		if (y<190){
-		y += yspeed;
-		yspeed += 0.002;}
-		else if (y>=190){
-			y=190;
-			yspeed=0;
-			alpha-=1;
+	void draw()
+	{
+		switch (state)
+		{
+			case LEVEL_DOWN_WAITING:
+				break;
+			case LEVEL_DOWN_FALLING:
+				GD.ColorA(255);
+				GD.Vertex2ii(x,y,z);
+				break;
+			case LEVEL_DOWN_LANDED:
+				GD.ColorA(alpha);
+				GD.Vertex2ii(x,y,z);
+				break;
+			case LEVEL_DOWN_DESTROY:
+				break;
 		}
-		if (alpha<5){
-			alpha = 0;
-		}
+	}
+	void start()
+	{
+		flag_start = true;
+	}
+	void destroy()
+	{
+		flag_destroy = true;
 	}
 
-	void show1(){
-	GD.ColorA(alpha);
-	GD.Vertex2ii(x,y,z);
-	}
 };
-const int numOflevelups=1; //when I increase this to 2, bunny animation speed doubles
-levelUp* levelup[numOflevelups];
 
-const int numOfleveldowns=2;
-levelDown* leveldown[numOfleveldowns];
+levelUp *levelup;
 
-const int numOfDrops= 30;
+levelDown *leveldown;
+
+const int numOfDrops= 3;
 Drop* drops[numOfDrops]; //Drop d -> one pizza. Array makes more than one pizza fall
 
 boolean collide(float x1, float y1,float x2,float y2){ //say pizza is (x1,y1) and bunny is (x2,y2)
@@ -157,7 +291,8 @@ boolean collide(float x1, float y1,float x2,float y2){ //say pizza is (x1,y1) an
 	float bunnyCentreX = x2 + BUNNY1_WIDTH/2;
 	float bunnyCentreY = y2 + BUNNY1_HEIGHT/2;
 	float distance =hypot(bunnyCentreX-pizzaCentreX,bunnyCentreY-pizzaCentreY);
-	if (distance < maxDistance){
+	if (distance < maxDistance)
+	{
 		return true;	
 	}
 	return false;
@@ -207,12 +342,9 @@ GD.RestoreContext();
 for (int i=0; i<numOfDrops;i++){
 drops[i]->reset();
 }
-for (int i=0; i<numOflevelups;i++){
-levelup[i]->reset();
-}
-for (int i=0; i<numOfleveldowns;i++){
-leveldown[i]->reset();
-}
+levelup->start();
+leveldown->start();
+fruit_flag = 0;
 }
 
 void drawBackButton() {
@@ -302,16 +434,14 @@ goal_time = millis() - 2000;
 for (int i=0; i<numOfDrops;i++){
 	drops[i]->reset();
 }
-for (int i=0; i<numOflevelups;i++){
-	levelup[i]->reset();
-}
-for (int i=0; i<numOfleveldowns;i++){
-	leveldown[i]->reset();
-}
+levelup->start();
+leveldown->start();
+fruit_flag = 0;
 GD.RestoreContext();
 }
 
 void LevelOneGoal(){
+GD.SaveContext();
 GD.ClearColorRGB(0xffffff);
 GD.Clear();
 GD.ColorRGB(0xff0066); 
@@ -327,6 +457,14 @@ GD.cmd_text((GD.w/2),(GD.h/2)+30,26,OPT_CENTER, "Avoid 200 pizzas to pass.");
 GD.ColorRGB(0xffb0f7);
 GD.cmd_text((GD.w/2)-1,(GD.h/2)+11,26,OPT_CENTER, "Hoppy will be crushed under the pizzas!");
 GD.cmd_text((GD.w/2)-1,(GD.h/2)+31,26,OPT_CENTER, "Avoid 200 pizzas to pass.");
+strawberry_time.reset();
+second_strawberry.reset();
+blueberry_time.reset();
+second_blueberry.reset();
+levelup->start();
+leveldown->start();
+fruit_flag = 0;
+GD.RestoreContext();
 }
 
 void gameOver(){
@@ -357,21 +495,25 @@ GD.Tag(BUTTON_MENU); GD.cmd_text(GD.w/2,180+20,26,OPT_CENTER, "QUIT");
 GD.RestoreContext();
 counter = 0;
 //goal_time = millis() - 2000;
-for (int i=0; i<numOfDrops;i++){
-drops[i]->reset();}
-for (int i=0; i<numOflevelups;i++){
-levelup[i]->reset();
+for (int i=0; i<numOfDrops;i++)
+{
+drops[i]->reset();
 }
-for (int i=0; i<numOfleveldowns;i++){
-leveldown[i]->reset();
+levelup->start();
+leveldown->start();
+strawberry_time.reset();
+second_strawberry.reset();
+blueberry_time.reset();
+second_blueberry.reset();
+fruit_flag = 0;
 }
-}
+
 bool bunnyDirection=true;
 bool flag_hit=false;
 uint32_t last_display_update=0;
 boolean levelup_flag = false;
 boolean leveldown_flag = false;
-boolean fruit_flag;
+
 
 
 
@@ -387,12 +529,8 @@ LOAD_ASSETS();
 for (int i=0; i<numOfDrops;i++){
 	drops[i] = new Drop(); //Recalculate Drop class for each drop 
 	}
-for (int i=0; i<numOfleveldowns;i++){
-	leveldown[i] = new levelDown(); //Recalculate Drop class for each drop 
-	}
-for (int i=0; i<numOflevelups;i++){
-	levelup[i] = new levelUp(); //Recalculate Drop class for each drop 
-	}
+leveldown = new levelDown();
+levelup = new levelUp(); // Recalculate Drop class for each drop
 }
 
 void bunnyAnimation(){
@@ -440,101 +578,132 @@ void bunnyAnimation(){
 	}
 
 }
-boolean flagb;
-boolean flags;
 
 void drawFruit(){
-	GD.SaveContext();
-
 	
-	GD.cmd_loadidentity();
-	GD.cmd_scale(F16(0.8), F16(0.8));
-	GD.cmd_setmatrix();
-/*  	if (last_blueberry.check()){
-		flagb = true;
-	}
-	else {
-		flagb = false;
-	}
-	if (flagb == true){  */
-		for (int i=0; i<numOfleveldowns;i++){
-		leveldown[i]->fall(); //speed and fall animation is simulated here
-		leveldown[i]->show1(); //pizzas are drawn with this function
-		last_blueberry.reset();
-		if (collide(leveldown[i]->x, leveldown[i]->y, bunny_x,bunny_y)==true && leveldown[i]->y <190){
-			leveldown[i]->alpha = 0;
-			eaten_blueberry.reset();
-			fruit_flag = false;
-			}
-		}
-	
+	//FRUIT FALLING AND DESTROY CONDITIONS
 	GD.cmd_loadidentity();
 	GD.cmd_scale(F16(0.8), F16(0.8));
 	GD.cmd_setmatrix();
 	maxDistance = 30;
-/* 	if (last_strawberry.check()){
-	flags = true;
-	}	
-	else {
-		flags = false;
-	}
-	if (flags ==true){  */
-		for (int i=0; i<numOflevelups;i++){
-		levelup[i]->fall(); //speed and fall animation is simulated here
-		levelup[i]->show1(); //pizzas are drawn with this function
-		last_strawberry.reset(); //Time since last strawberry == 0;
-		if (collide(levelup[i]->x, levelup[i]->y, bunny_x,bunny_y)==true && levelup[i]->y <190){
-			levelup[i]->alpha = 0;
-			eaten_strawberry.reset();
-			fruit_flag = true;
-			}
+	if (blueberry_time.check()) 
+	{ 
+		if(leveldown->state == LEVEL_DOWN_WAITING && numOfBlueberries < 2)
+		{
+		leveldown->start(); //set flag_start = true to bring state to falling
+		++numOfBlueberries;
+		}
+		if (leveldown->state == LEVEL_DOWN_FALLING) {
+			if (collide(leveldown->x, leveldown->y, bunny_x, bunny_y) == true && leveldown->y < 190)
+			{	
+			leveldown->destroy(); //sets flag destroy to true to bring state to destroy (before landed state)
+			fruit_flag = 1;
+			second_blueberry.reset();
+			eaten_blueberry.reset();
+			} 
+		
+		second_blueberry.reset();
+		}
+
+	if (leveldown->state == LEVEL_DOWN_DESTROY && second_blueberry.check())
+		{
+		leveldown->state = LEVEL_DOWN_WAITING;
 		}
 	
-	if (fruit_flag == false){
+	leveldown->process(); // begin process by waiting
+	leveldown->draw();	 //begin draw function
+	}
+
+
+	maxDistance = 30;
+	if (strawberry_time.check()) //if 5 s passed since pizza landed
+	{ 
+		if(levelup->state == LEVEL_UP_WAITING && num < 2)
+		{
+		levelup->start(); //set flag_start = true to bring state to falling
+		++num;
+		}
+		if (levelup->state == LEVEL_UP_FALLING) {
+			if (collide(levelup->x, levelup->y, bunny_x, bunny_y) == true && levelup->y < 190)
+			{	
+			levelup->destroy(); //sets flag destroy to true to bring state to destroy (before landed state)
+			fruit_flag = 2;
+			second_strawberry.reset();
+			eaten_strawberry.reset();
+			} 
+		
+		second_strawberry.reset();
+		}
+
+	if (levelup->state == LEVEL_UP_DESTROY && second_strawberry.check())
+		{
+		levelup->state = LEVEL_UP_WAITING;
+		}
+	
+	levelup->process(); 
+	levelup->draw();	
+	}
+	if (fruit_flag == 0){
+		maxDistance = 20;
+		bunny_y = 160;
+		GD.cmd_loadidentity();
+		GD.cmd_scale(F16(0.6), F16(0.6));
+		GD.cmd_setmatrix();
+	}
+	else if (fruit_flag == 1){
 		if (!eaten_blueberry.check()){ //if timer is less than 10 s
 			leveldown_flag = true;
 		}	
 		else { //else if timer is >= 10 s
 			leveldown_flag = false;
 		}
-		GD.cmd_loadidentity();
+		
 		if (leveldown_flag == true){
 			maxDistance = 1.2*20;
 			bunny_y = 155;
+			GD.cmd_loadidentity();
 			GD.cmd_scale(F16(1), F16(1));
+				GD.cmd_setmatrix();
 		}
+
 		if (leveldown_flag == false){
 			maxDistance = 20;
 			bunny_y = 160;
+			GD.cmd_loadidentity();
 			GD.cmd_scale(F16(0.6), F16(0.6));
+				GD.cmd_setmatrix();
 			}
 	}
 	
-	if (fruit_flag == true){
+	else if (fruit_flag == 2){
 		if (!eaten_strawberry.check()){ //if timer is less than 10 s
 			levelup_flag = true;
 		}	
 		else {  					//else if timer is >= 10 s
 			levelup_flag = false;
 		}
-		GD.cmd_loadidentity();
+		
 		if (levelup_flag == true){
 			maxDistance = 0.4 * maxDistance;
 			bunny_y = 165;
+			GD.cmd_loadidentity();
 			GD.cmd_scale(F16(0.4), F16(0.4));
+			GD.cmd_setmatrix();
 		}
 		if (levelup_flag == false){
 			maxDistance = 20;
 			bunny_y = 160;
+			GD.cmd_loadidentity();
 			GD.cmd_scale(F16(0.6), F16(0.6));
+			GD.cmd_setmatrix();
 		}
+		
 	}
 
-	GD.cmd_setmatrix();
 	GD.ColorA(255);
 	bunnyAnimation();
-	GD.RestoreContext();
 }
+
 void loop()
 { 
 GD.get_inputs();
@@ -622,6 +791,8 @@ case PAGE_GOAL:
 	}
 	else {
 	page_display = PAGE_PLAY;}
+	levelup->state = LEVEL_UP_WAITING;
+	leveldown->state = LEVEL_DOWN_WAITING;
 	break;
 
 case PAGE_YOUWIN:
@@ -637,10 +808,4 @@ case PAGE_GAMEOVER:
 	GD.swap();
 	delay(10);
 }
-
-
-
-
-
-
 
