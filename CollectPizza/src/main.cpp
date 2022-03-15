@@ -10,6 +10,13 @@ int potion_random = random(5000, 50000);
 int potion2_random = random(5000, 50000);
 int straw_random = random(5000, 50000);
 int straw2_random = random(5000, 50000);
+
+static uint32_t hit_time = millis() - 5000;
+static uint32_t hit_time2 = millis() - 5000;
+
+int counter = 0;
+boolean flag_fade=false;
+
 enum
 {
 	PAGE_START,
@@ -23,48 +30,40 @@ enum
 
 uint8_t page_display = PAGE_MENU; //Starting display page
 
-class Pizza
-{
-	float yspeed = random(0.5,1.5);
-	int z = random(10,16);
+class Drop{
+	float yspeed = random(1,3); //pizzas start at different speeds above the screen
+	int z = random(10,16); //Each pizza is a random pizza for the duration of its fall
 	int alpha = 255;
 public:
 	float x = random(0,290);
-	float y = random(-200,0); //Start off the screen
+	float y = random(-200,-10);
 	
-	void reset()
-	{
+	void reset(){
 		alpha=255;
-		y=random(-200,0); //Start off the screen
+		y=random(-200,-10);
 		x=random(0,290);
-		yspeed += random(0.5,1.5);
+		yspeed = random(0.5,1.5);
 	}
-
-	void fall()
-	{
-		if (y<190)
-		{
-			y += yspeed;
-			yspeed += 0.002;
-		}
-		else if (y>=190)
-		{
+	void fall(){
+		if (y<190){
+		y += yspeed;
+		yspeed += 0.002;}
+		else if (y>=190){
 			y=190;
 			yspeed=0;
 			alpha-=1;
 		}
-		if (alpha<5) //This works
-		{ 
+		if (alpha<5){ //This works
 			reset();
 		}
 	}
-	void show()
-	{
-		GD.ColorA(alpha);
-		GD.Vertex2ii(x,y,z);
+
+	void show1(){
+	
+	GD.ColorA(alpha);
+	GD.Vertex2ii(x,y,z);
 	}
 };
-
 enum
 {
 	WAITING_STRAWBERRY,
@@ -257,31 +256,30 @@ public:
 
 strawBerry *strawberry;
 Potion *potion;
-const int numOfPizzas= 40;
-Pizza* pizza[numOfPizzas]; 
-
+const int numOfDrops=15;
+Drop* drops[numOfDrops]; //Drop d -> one pizza. Array makes more than one pizza fall
 int maxDistance = 20;
 
-boolean collide(float x1, float y1,float x2,float y2)
+boolean collide(float x1, float y1,float x2,float y2)  //say pizza is (x1,y1) and bunny is (x2,y2)
 { 
-	/*Centre coordinate calculations*/
+	//Centre coordinate calculations
 	float pizzaCentreX = x1 + BBQ1_WIDTH/2;
 	float pizzaCentreY = y1 + BBQ1_HEIGHT/2;
 	float bunnyCentreX = x2 + BUNNY1_WIDTH/2;
 	float bunnyCentreY = y2 + BUNNY1_HEIGHT/2;
 	float distance =hypot(bunnyCentreX-pizzaCentreX,bunnyCentreY-pizzaCentreY);
-	if (distance < maxDistance)
+	if (distance < 35)
 	{
 		return true;	
 	}
 	return false;
 }
-
 /*Page Drawings and Tag Definitions*/
 void drawMenu();
 void drawInstruct();
 void drawBackButton();
 void returnMenu();
+
 
 #define BUTTON_MENU 1
 #define BUTTON_INSTRUCT 2
@@ -290,9 +288,16 @@ void returnMenu();
 #define BUTTON_GAMEOVER 5
 #define BUTTON_YOUWIN 6
 
+
 static uint32_t goal_time = millis()-2000;
 int collided = 0;
 int alpha=0;
+
+void cmd_text( int16_t x,
+int16_t y,
+int16_t font,
+uint16_t options,
+const char* s );
 
 void drawMenu()
 {
@@ -324,7 +329,7 @@ void drawMenu()
 	goal_time = millis();
 }
 
-void drawBackButton()
+void drawBackButton() 
 {
 	GD.SaveContext();
 	GD.ColorRGB(0xff78ae);
@@ -341,7 +346,8 @@ void drawInstruct()
 	GD.SaveContext();
 	GD.ColorRGB(0xff78ae);
 	GD.cmd_text(GD.w/2,(GD.h/2)-30,26,OPT_CENTER, "Move Hoppy left or right by touching the screen. It's raining pizza!");
-	GD.cmd_text((GD.w/2),(GD.h/2),26,OPT_CENTER, "Avoid the falling pizzas to save Hoppy.");
+	GD.cmd_text((GD.w/2),(GD.h/2),26,OPT_CENTER, "Collect as many as you can so that Hoppy can survive");
+	GD.cmd_text((GD.w/2),(GD.h/2)+30,26,OPT_CENTER,"the harsh winter ahead.");
 	GD.ColorRGB(0xff78ae);
 	GD.Tag(BUTTON_GOAL); GD.cmd_text((GD.w/2)-1,180+1,26,OPT_CENTER, "PRESS TO PLAY");
 	GD.ColorRGB(0x6b1f53);
@@ -362,8 +368,6 @@ void returnMenu()
 	GD.RestoreContext();
 }
 
-int score = 0;
-
 void Score()
 {
 	GD.SaveContext();
@@ -372,7 +376,7 @@ void Score()
 	GD.cmd_scale(F16(0.7), F16(0.7));
 	GD.cmd_setmatrix();
 	char string[50];
-	sprintf(string, "Pizzas avoided: %d",score);
+	sprintf(string, "Pizzas collected: %d",counter);
 	GD.cmd_text(4, 20, 26, OPT_CENTERY, string);
 	GD.RestoreContext();
 }
@@ -412,7 +416,7 @@ void youWin()
 	GD.Tag(BUTTON_GOAL); GD.cmd_text((GD.w/2)-1,180+1,26,OPT_CENTER, "THE NEXT DAY...");
 	GD.ColorRGB(0x6b1f53);
 	GD.Tag(BUTTON_GOAL); GD.cmd_text(GD.w/2,180,26,OPT_CENTER, "THE NEXT DAY...");	
-	score = 0;
+	counter = 0;
 	goal_time = millis();
 	GD.RestoreContext();
 }
@@ -437,15 +441,15 @@ void LevelOneGoal()
 	GD.ColorRGB(0x00ffae);
 	GD.cmd_text(GD.w/2,(GD.h/2)-40,30,OPT_CENTER, "GOAL");
 	GD.ColorRGB(0xff1fe9);
-	GD.cmd_text((GD.w/2),(GD.h/2)+10,26,OPT_CENTER, "Hoppy will be crushed under the pizzas!");
-	GD.cmd_text((GD.w/2),(GD.h/2)+30,26,OPT_CENTER, "Avoid 200 pizzas to pass.");
+	GD.cmd_text((GD.w/2),(GD.h/2)+10,26,OPT_CENTER, "Collect 60 pizzas. Be careful! If you reach");
+	GD.cmd_text((GD.w/2),(GD.h/2)+30,26,OPT_CENTER, "-5 points, Hoppy will starve.");
 	GD.ColorRGB(0xffb0f7);
-	GD.cmd_text((GD.w/2)-1,(GD.h/2)+11,26,OPT_CENTER, "Hoppy will be crushed under the pizzas!");
-	GD.cmd_text((GD.w/2)-1,(GD.h/2)+31,26,OPT_CENTER, "Avoid 200 pizzas to pass.");
-	GD.RestoreContext();
-	for (int i=0; i<numOfPizzas;i++) //Resets pizzas
+	GD.cmd_text((GD.w/2)-1,(GD.h/2)+11,26,OPT_CENTER, "Collect 60 pizzas. Be careful! If you reach");
+	GD.cmd_text((GD.w/2)-1,(GD.h/2)+31,26,OPT_CENTER, "-5 points, Hoppy will starve.");
+	GD.RestoreContext(); 
+	for (int i=0; i<numOfDrops;i++) //Resets pizzas
 	{		
-		pizza[i]->reset();
+		drops[i]->reset();
 	}
 	strawberry->state = WAITING_STRAWBERRY;
 	potion->state = WAITING_POTION;
@@ -455,7 +459,7 @@ void LevelOneGoal()
 	second_potion.reset();
 	strawberry->start();
 	potion->start();
-	collided = 0;				//Resets collided to zero (to revert to original bunny scale)
+	collided = 0;	
 }
 
 void gameOver()
@@ -481,11 +485,11 @@ void gameOver()
 	GD.Tag(BUTTON_GOAL); GD.cmd_text(GD.w/2,180,26,OPT_CENTER, "REVIVE HOPPY");	
 	GD.ColorA(255);
 	GD.ColorRGB(0xff78ae);
-	GD.Tag(BUTTON_MENU); GD.cmd_text((GD.w/2)-1,180+19,26,OPT_CENTER, "QUIT");
+	GD.Tag(BUTTON_GOAL); GD.cmd_text((GD.w/2)-1,180+19,26,OPT_CENTER, "QUIT");
 	GD.ColorRGB(0x6b1f53);
-	GD.Tag(BUTTON_MENU); GD.cmd_text(GD.w/2,180+20,26,OPT_CENTER, "QUIT");	
+	GD.Tag(BUTTON_GOAL); GD.cmd_text(GD.w/2,180+20,26,OPT_CENTER, "QUIT");
 	GD.RestoreContext();
-	score = 0;
+	counter = 0;
 	goal_time = millis();
 }
 
@@ -505,55 +509,54 @@ void setup()
 	SPI.begin(5, 15, 14);
 	GD.begin();
 	LOAD_ASSETS();
-	for (int i=0; i<numOfPizzas;i++)
+	for (int i=0; i<numOfDrops;i++)
 	{
-		pizza[i] = new Pizza();
+		drops[i] = new Drop(); //Recalculate Drop class for each drop 
 	}
 	potion = new Potion();
 	strawberry = new strawBerry();
 	randomSeed(analogRead(0));
-}
-
-int bunny_x = 0; //One sprite
-int bunny_y = 160;
-
-void bunnyAnimation()
-{
-	if (GD.inputs.x>0 && GD.inputs.x<160)
-	{
-		bunny_x = (bunny_x - 1)%340; //-1 is direction of bunny walk (bunny walks left)
-		GD.Vertex2ii(bunny_x, bunny_y, (bunny_x/8)%3); // "/8" is how many pixels between changing the cell. "%3" is how many iterations or switches you are doing
-		bunnyDirection=false;
 	}
 
-	if (GD.inputs.x>160 && GD.inputs.x<320)
-	{ 
-		bunny_x = (bunny_x+1)%340;
-		GD.Vertex2ii(bunny_x, bunny_y , 4+(bunny_x/8)%3); 
-		bunnyDirection = true;
-	}
-	if (GD.inputs.x < 0)
-	{
-		if	(bunnyDirection==false)
+	int bunny_x = 0; //One sprite
+	int bunny_y = 160;
+
+	void bunnyAnimation(){
+		if (GD.inputs.x>0 && GD.inputs.x<160)
 		{
-			GD.Vertex2ii(bunny_x,bunny_y,BUNNY9_HANDLE);
+			bunny_x = (bunny_x - 1)%340; //-1 is direction of bunny walk (bunny walks left)
+			GD.Vertex2ii(bunny_x, bunny_y, (bunny_x/8)%3); // /8 is how many pixels between changing the cell -> %3 is how many iterations or switches you are doing. . -> . -> . -> .
+			bunnyDirection=false;
 		}
-		if	(bunnyDirection == true)
+
+		if (GD.inputs.x>160 && GD.inputs.x<320)
+		{ 
+			bunny_x = (bunny_x+1)%340; //+1 to change direction of bunny walk (bunny walks right)
+			GD.Vertex2ii(bunny_x, bunny_y , 4+(bunny_x/8)%3); 
+			bunnyDirection = true;
+		}
+		if (GD.inputs.x < 0)
 		{
-			GD.Vertex2ii(bunny_x,bunny_y,BUNNY10_HANDLE);
+			if	(bunnyDirection==false)
+				{
+				GD.Vertex2ii(bunny_x,bunny_y,BUNNY9_HANDLE);
+				}
+			if	(bunnyDirection == true)
+				{
+				GD.Vertex2ii(bunny_x,bunny_y,BUNNY10_HANDLE);
+				}
 		}
-	}
-	/*Screen border boundaries*/
-	if (bunny_x < 1 && GD.inputs.x > 0 && GD.inputs.x<160)  //1 instead of 0 to mitigate glitch
-	{
-		bunny_x = 1;
- 		GD.Vertex2ii(bunny_x, bunny_y, (millis()/100)%3);
-	}
-	if (bunny_x > (320-BUNNY9_WIDTH/1.5) && GD.inputs.x > 160 && GD.inputs.x < 320)
-	{
-		bunny_x = (320-BUNNY9_WIDTH/1.5);
-		GD.Vertex2ii(bunny_x, bunny_y, 4+(millis()/100)%3);
-	}
+			/*Screen border boundaries*/
+		if (bunny_x < 1 && GD.inputs.x > 0 && GD.inputs.x<160)  //1 instead of 0 to mitigate glitch
+		{
+			bunny_x = 1;
+			GD.Vertex2ii(bunny_x, bunny_y, (millis()/100)%3);
+		}
+		if (bunny_x > (320-BUNNY9_WIDTH/1.5) && GD.inputs.x > 160 && GD.inputs.x < 320)
+		{
+			bunny_x = (320-BUNNY9_WIDTH/1.5);
+			GD.Vertex2ii(bunny_x, bunny_y, 4+(millis()/100)%3);
+		}
 }
 
 int numOfPotions = 0;
@@ -567,7 +570,7 @@ void drawFruit()
 	maxDistance = 30;
 	if (potion_time.check()) 
 	{ 
-		if(potion->state == WAITING_POTION && numOfPotions < 2)
+		if(potion->state == WAITING_POTION && numOfPotions < 10)
 		{
 			potion->start(); //set flag_start = true to bring state to falling
 			++numOfPotions;
@@ -581,7 +584,7 @@ void drawFruit()
 				second_potion.reset();
 				eaten_potion.reset();
 			} 
-			second_potion.reset();
+				second_potion.reset();
 		}
 
 	if (potion->state == DESTROY_POTION && second_potion.check())
@@ -598,26 +601,26 @@ void drawFruit()
 	maxDistance = 30;
 	if (strawberry_time.check()) //if 5 s passed since pizza landed
 	{ 
-		if(strawberry->state == WAITING_STRAWBERRY && numOfStrawberries < 2)
+		if(strawberry->state == WAITING_STRAWBERRY && numOfStrawberries < 4)
 		{
-		strawberry->start(); //set flag_start = true to bring state to falling
-		++numOfStrawberries;
+			strawberry->start(); //set flag_start = true to bring state to falling
+			++numOfStrawberries;
 		}
 		if (strawberry->state == FALLING_STRAWBERRY)
 		{
 			if (collide(strawberry->x, strawberry->y, bunny_x, bunny_y) == true && strawberry->y < 190)
 			{	
-			strawberry->destroy(); //sets flag destroy to true to bring state to destroy (before landed state)
-			collided = 2;
-			second_strawberry.reset();
-			eaten_strawberry.reset();
+				strawberry->destroy(); //sets flag destroy to true to bring state to destroy (before landed state)
+				collided = 2;
+				second_strawberry.reset();
+				eaten_strawberry.reset();
 			} 
-			second_strawberry.reset();
+				second_strawberry.reset();
 		}
 		if (strawberry->state == DESTROY_STRAWBERRY && second_strawberry.check())
-			{
+		{
 			strawberry->state = WAITING_STRAWBERRY;
-			}
+		}
 			strawberry->process(); 
 			strawberry->draw();	
 	}
@@ -635,7 +638,8 @@ void drawFruit()
 		{ 
 			potion_flag = true;
 		}	
-		else { 
+		else 
+		{ 
 			potion_flag = false;
 		}
 		
@@ -654,7 +658,7 @@ void drawFruit()
 			bunny_y = 160;
 			GD.cmd_loadidentity();
 			GD.cmd_scale(F16(0.6), F16(0.6));
-				GD.cmd_setmatrix();
+			GD.cmd_setmatrix();
 		}
 	}
 	else if (collided == 2)
@@ -692,81 +696,101 @@ void drawFruit()
 cl_timer last_touch(100);
 
 void loop()
-	{ 
+{ 
 	GD.get_inputs();
-	cl_timer last_touch(1000);
-
-	if (GD.inputs.tag != 0)
-	{
+	cl_timer last_touch(1000); //time between touch triggers should be at least 1 second
+	if (GD.inputs.tag != 0){ //If tag is being touched
 		if (last_touch.check())
 		{
-			last_touch.reset();
+			last_touch.reset();  
 			switch(GD.inputs.tag)
 			{
-				case BUTTON_MENU:
-				page_display = PAGE_MENU;
-				break;
+			case BUTTON_MENU:
+			page_display = PAGE_MENU;
+			break;
 
-				case BUTTON_INSTRUCT:
-				page_display = PAGE_INFO;
-				break;
+			case BUTTON_INSTRUCT:
+			page_display = PAGE_INFO;
+			break;
 
-				case BUTTON_GOAL:
-				page_display = PAGE_GOAL;
-				break;
-				
-				case BUTTON_PLAY2:
-				page_display = PAGE_PLAY;
-				break;
+			case BUTTON_GOAL:
+			page_display = PAGE_GOAL;
+			break;
+			
+			case BUTTON_PLAY2:
+			page_display = PAGE_PLAY;
+			break;
 
-				case BUTTON_GAMEOVER:
-				page_display = PAGE_GAMEOVER;
-				break;
+			case BUTTON_GAMEOVER:
+			page_display = PAGE_GAMEOVER;
+			break;
 
-				case BUTTON_YOUWIN:
-				page_display = PAGE_YOUWIN;
-				break;
+			case BUTTON_YOUWIN:
+			page_display = PAGE_YOUWIN;
+			break;
 			}
 		}
-	}
+}
 
-	switch (page_display)
-	{
-		case PAGE_MENU:
+	
+
+
+switch (page_display)
+{
+	case PAGE_MENU:
 		drawMenu();
 		break;
-		
-		case PAGE_PLAY:
-		{GD.Clear();
+	
+	case PAGE_PLAY:
+		GD.Clear();
 		GD.Begin(BITMAPS);
 		background();
 		Score();
-		GD.ColorRGB(0xffffff);//Must change the color to white, otherwise the previous color will affect all other drawings
+		GD.ColorRGB(0xffffff);//Must change the color to white, otherwise the previous color (green) will affect all other drawings
 		GD.cmd_loadidentity();
 		GD.cmd_scale(F16(0.4), F16(0.4));
 		GD.cmd_setmatrix();
-		for (int i=0; i<numOfPizzas;i++)
+		for (int i=0; i<numOfDrops;i++)
 		{
-			pizza[i]->fall(); //speed and fall animation is simulated here
-			pizza[i]->show(); //pizzas are drawn with this function
-			if (collide(pizza[i]->x, pizza[i]->y, bunny_x,bunny_y)==true && pizza[i]->y <190)
+			drops[i]->fall(); //speed and fall animation is simulated here
+			drops[i]->show1(); //pizzas are drawn with this function
+			if (collide(drops[i]->x, drops[i]->y, bunny_x,bunny_y)==true && drops[i]->y <190)
 			{
-				page_display = PAGE_GAMEOVER;
+				drops[i]->reset();
+				hit_time = millis();
+				counter++;
 			}	
-			if (pizza[i]->y > 190)
+			if (drops[i]->y > 190)
 			{
-				score += 1;
+				counter -= 1;
+				hit_time2 = millis();
 			}
 		}
+
+		if (millis() - hit_time < 200)
+		{
+			GD.ColorA(255);
+			GD.cmd_text(100,100,31,OPT_CENTER,"1 POINT!"); 
+		}
+		if (millis() - hit_time2 < 200)
+		{
+			GD.ColorA(255);
+			GD.ColorRGB(0x8a3e3e);
+			GD.cmd_text(200,130,31,OPT_CENTER,"-1 POINT :(");
+		}
+		GD.ColorRGB(0xffffff);
 		drawFruit();
-		if (score == 200)
+		if (counter <= -5)
+		{
+			page_display = PAGE_GAMEOVER;
+		}
+			
+		if (counter == 100)
 		{
 			page_display = PAGE_YOUWIN;
 		}
-		GD.ColorRGB(0xffffff);
-		returnMenu();
+		returnMenu(); //draw return to menu button
 		break;
-		} 
 
 		case PAGE_INFO:
 			drawInstruct();
@@ -777,7 +801,7 @@ void loop()
 			{
 				LevelOneGoal();
 			}
-			else 
+			else
 			{
 				page_display = PAGE_PLAY;
 			}
@@ -785,13 +809,21 @@ void loop()
 
 		case PAGE_YOUWIN:
 			youWin();
+			bunny_x = 0;
 			break;
 
 		case PAGE_GAMEOVER:
 			gameOver();
+			bunny_x = 0;
 			break;
 		}
 		GD.swap();
 		delay(10);
 }
+
+
+
+
+
+
 
